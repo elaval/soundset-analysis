@@ -1,0 +1,13 @@
+numpy
+scipy
+resampy
+tensorflow
+six
+pysoundfile
+ffmpeg-python
+pydub
+matplotlib
+keras
+flask
+flask-cors
+flask-restful

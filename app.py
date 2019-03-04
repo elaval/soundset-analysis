@@ -32,7 +32,7 @@ import werkzeug
 import io
 import csv
 
-from lib.soundset import storeFile, getSpectrum, batchesToPlainArray, buildSamples
+from lib.soundset import storeFile, getSpectrum, batchesToPlainArray, buildSamples, buildPredictions
 
 
 UPLOAD_FOLDER = './uploads'
@@ -240,13 +240,8 @@ class ClassificationManager(Resource):
         filename = storeFile(args)
         spectrum = getSpectrum(filename)
         samples = buildSamples(spectrum)
-
-        csvOutput = [["num", "class", "seconds", "percent"]]
-        predictions = model.predict(samples)
-        for ndx, member in enumerate(predictions):
-            csvOutput.append([ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
-
-        response = csvResponse(csvOutput)
+        predictions = buildPredictions(model, samples)
+        response = csvResponse(predictions)
         return response
 
 api.add_resource(TodoSimple, '/elm')

@@ -5,8 +5,23 @@ import vggish_input
 import vggish_params
 import vggish_postprocess
 import vggish_slim
+import keras
+from keras.models import load_model
+from keras.utils import CustomObjectScope
+from keras.initializers import glorot_uniform
+import numpy as np
 
 UPLOAD_DIR = "./inputs/uploaded/"
+
+modelFile = "./models/celulosa_v0.2.0.h5" 
+
+with CustomObjectScope({'GlorotUniform': glorot_uniform()}):
+    model = load_model(modelFile)
+
+model.compile(optimizer=tf.train.AdamOptimizer(), 
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
 
 def storeFile(args):
   audioFile = args['file']
@@ -62,3 +77,12 @@ def buildSamples(batch):
                             feed_dict={features_tensor: batch})
 
     return samples
+
+
+def buildPredictions(model, samples):
+    csvOutput = [["num", "class", "seconds", "percent"]]
+    predictions = model.predict(samples)
+    for ndx, member in enumerate(predictions):
+        csvOutput.append([ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
+
+    return csvOutput

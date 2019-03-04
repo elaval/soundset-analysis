@@ -32,7 +32,10 @@ import werkzeug
 import io
 import csv
 
-UPLOAD_FOLDER = '/app/uploads'
+from lib.soundset import storeFile, getSpectrum, batchesToPlainArray, buildSamples
+
+
+UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'mp3'])
 
 app = Flask(__name__)
@@ -47,7 +50,7 @@ debug = []
 
 targetSoundset = "demo"
 
-modelFile = "/app/models/celulosa_v0.2.0.h5" 
+modelFile = "./models/celulosa_v0.2.0.h5" 
 
 with CustomObjectScope({'GlorotUniform': glorot_uniform()}):
     model = load_model(modelFile)
@@ -56,12 +59,12 @@ model.compile(optimizer=tf.train.AdamOptimizer(),
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 
-testFileDir = "/app/inputs/%s/testMP3" % targetSoundset
+testFileDir = "./inputs/%s/testMP3" % targetSoundset
 
 
 #Get Labels
 labels = []
-jointdir = "/app/inputs/%s/labels" % targetSoundset 
+jointdir = "./inputs/%s/labels" % targetSoundset 
 dirname = jointdir
 if os.path.isdir(jointdir):
     for i, dirname in enumerate(os.listdir(jointdir)):  
@@ -191,7 +194,65 @@ class TodoSimple(Resource):
         output = process()
         return csvResponse(output)
 
+class BatchManager(Resource):
+    def get(self):
+        output = process()
+        return {"output": str(output)}
+
+    def put(self):
+        data = [[1,2], [3,4]]
+
+
+        return csvResponse(data)
+
+    def post(self):
+
+        parse = reqparse.RequestParser()
+        parse.add_argument('file', type=werkzeug.datastructures.FileStorage, location='files')
+        args = parse.parse_args()
+        filename = storeFile(args)
+        output = getSpectrum(filename)
+
+        return output.tolist()
+
+class VectorManager(Resource):
+    # NOTE useful to convert from json array to np.arrays
+    #b_new = json.loads(obj_text)
+    #a_new = np.array(b_new)
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('file', type=werkzeug.datastructures.FileStorage, location='files')
+        args = parse.parse_args()
+        filename = storeFile(args)
+        output = getSpectrum(filename)
+
+        batches = batchesToPlainArray(output)
+        samples = buildSamples(batches)
+        response = jsonify(samples.tolist())
+        response.status_code = 200 # or 400 or whatever
+        return response
+
+class ClassificationManager(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('file', type=werkzeug.datastructures.FileStorage, location='files')
+        args = parse.parse_args()
+        filename = storeFile(args)
+        spectrum = getSpectrum(filename)
+        samples = buildSamples(spectrum)
+
+        csvOutput = [["num", "class", "seconds", "percent"]]
+        predictions = model.predict(samples)
+        for ndx, member in enumerate(predictions):
+            csvOutput.append([ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
+
+        response = csvResponse(csvOutput)
+        return response
+
 api.add_resource(TodoSimple, '/elm')
+api.add_resource(BatchManager, '/batches')
+api.add_resource(VectorManager, '/vectors')
+api.add_resource(ClassificationManager, '/classes')
 
  
 if __name__ == '__main__':

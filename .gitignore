@@ -9,4 +9,8 @@ outputs/*.tsv
 *.wav
 credentials/
 credentials/soundset-abffd-firebase-adminsdk-zrq83-d0a9bbfe7c.json
-.vscode
+.vscode/*
+.vscode2/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json

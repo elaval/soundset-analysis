@@ -7,3 +7,5 @@ __pycache__
 outputs/*.tsv
 *.mp3
 *.wav
+credentials/
+credentials/soundset-abffd-firebase-adminsdk-zrq83-d0a9bbfe7c.json

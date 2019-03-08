@@ -36,6 +36,17 @@ import boto3
 from lib.soundset import storeFile, getSpectrum, batchesToPlainArray, buildSamples, buildPredictions
 import ntpath
 
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+import datetime
+
+S3_KEY =os.environ.get('S3_KEY')
+S3_SECRET=os.environ.get('S3_SECRET')
+
+cred = credentials.Certificate("./credentials/soundset-abffd-firebase-adminsdk-zrq83-d0a9bbfe7c.json")
+default_app = firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'mp3'])
@@ -52,7 +63,7 @@ debug = []
 
 targetSoundset = "demo"
 
-modelFile = "./models/celulosa_v0.2.0.h5" 
+modelFile = "./models/enel/model.h5" 
 
 with CustomObjectScope({'GlorotUniform': glorot_uniform()}):
     model = load_model(modelFile)
@@ -66,11 +77,12 @@ testFileDir = "./inputs/%s/testMP3" % targetSoundset
 
 #Get Labels
 labels = []
-jointdir = "./inputs/%s/labels" % targetSoundset 
-dirname = jointdir
-if os.path.isdir(jointdir):
-    for i, dirname in enumerate(os.listdir(jointdir)):  
-      labels.append(dirname)
+
+file = open("./models/enel/labels.txt", "r")
+for line in file:
+    labels.append(line.strip())
+
+print(labels) 
 
 def process(): 
     allSamples  = []
@@ -109,10 +121,10 @@ def process():
 def listS3Folder(bucket, prefix, id, secret):
     s3 = boto3.resource('s3', aws_access_key_id=id,
         aws_secret_access_key=secret)
-    bucket = s3.Bucket(name=bucket)
+    s3Bucket = s3.Bucket(name=bucket)
 
     output = []
-    for obj in bucket.objects.filter(Prefix=prefix):
+    for obj in s3Bucket.objects.filter(Prefix=prefix):
         file = ntpath.basename(obj.key)
         if file:
             output.append(file)
@@ -157,8 +169,24 @@ def csvToFile(name,data):
         tsv_writer.writerows(data)
 
 
+def checkNewFiles(bucket, prefix):
+    soundFiles = listS3Folder(bucket, prefix, S3_KEY, S3_SECRET)
+    predictionFiles = listS3Folder(bucket, "output", S3_KEY, S3_SECRET)
 
+    processedNames = {}
+    for file in predictionFiles:
+        fileBaseName = ntpath.basename(file)
+        (name,ext) = os.path.splitext(fileBaseName)
+        processedNames[name] = True
 
+    newFiles = []
+    for file in soundFiles:
+        fileBaseName = ntpath.basename(file)
+        (name,ext) = os.path.splitext(fileBaseName)
+        if name not in processedNames:
+            newFiles.append(file)
+
+    return newFiles
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -259,47 +287,54 @@ class ClassificationManager(Resource):
 class S3Demo(Resource):
     def post(self):
         parse = request.get_json()
-        id=parse["aws_access_key_id"]
-        secret=parse["aws_secret_access_key"]
+        id=os.environ.get('S3_KEY')
+        secret=os.environ.get('S3_SECRET')
         bucket= parse["bucket"]
         prefix = parse["prefix"]
-        #file = parse["file"]
 
         si = io.StringIO()
         cw = csv.writer(si, delimiter='\t')
 
 
-        fileList = listS3Folder(bucket, prefix, id, secret)
-
-
+        fileList = checkNewFiles(bucket, prefix)
 
         for file in fileList:
             fileBaseName = ntpath.basename(file)
             (name,ext) = os.path.splitext(fileBaseName)
-
+            
             destFile = os.path.join("./inputs/uploaded/",fileBaseName)
             destFileWav = os.path.join("./inputs/uploaded/",name+".wav")
-
+            
             downloadS3File(bucket, prefix, file, id, secret)
+            
             spectrum = getSpectrum(destFile)
-
-
-            #downloadS3File(bucket, prefix, file, id, secret)
 
             os.remove(destFile)
             os.remove(destFileWav)
 
             samples = buildSamples(spectrum)
-            predictions = buildPredictions(model, samples, name)
+            predictions = buildPredictions(model, samples, name, labels)
+
+            ref = db.collection(u"processed_files")
+            ref.add({
+                u"file":fileBaseName,
+                u"output":name+".tsv",
+                u"samples":len(samples),
+                u"date":datetime.datetime.now()
+            })
 
             csvToFile(name,predictions)
             uplaodS3File(bucket, prefix, name+".tsv", id, secret)
             cw.writerows(predictions)
+            
 
+        
         response = make_response(si.getvalue())
         response.headers["Content-Disposition"] = "attachment; filename=export.tsv"
         response.headers["Content-type"] = "text/tsv"
         return response
+
+        
 
 api.add_resource(TodoSimple, '/elm')
 api.add_resource(BatchManager, '/batches')

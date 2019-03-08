@@ -4,13 +4,17 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-  
+
     {
       "name": "Python: Terminal (integrated)",
       "type": "python",
       "request": "launch",
       "program": "${file}",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "env": {
+        "S3_KEY": "AKIAIEEARPSPC4DBCZXA",
+        "S3_SECRET": "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"
+      }
     },
 
     {

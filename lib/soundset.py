@@ -79,10 +79,10 @@ def buildSamples(batch):
     return samples
 
 
-def buildPredictions(model, samples):
-    csvOutput = [["num", "class", "seconds", "percent"]]
+def buildPredictions(model, samples, name):
+    csvOutput = [["name", "num", "class", "seconds", "percent"]]
     predictions = model.predict(samples)
     for ndx, member in enumerate(predictions):
-        csvOutput.append([ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
+        csvOutput.append([name, ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
 
     return csvOutput

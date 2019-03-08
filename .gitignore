@@ -4,3 +4,6 @@ mel_features.py
 audiosetModels
 __pycache__
 *.pyc
+outputs/*.tsv
+*.mp3
+*.wav

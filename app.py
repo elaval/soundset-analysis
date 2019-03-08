@@ -31,8 +31,10 @@ from werkzeug.utils import secure_filename
 import werkzeug
 import io
 import csv
+import boto3
 
 from lib.soundset import storeFile, getSpectrum, batchesToPlainArray, buildSamples, buildPredictions
+import ntpath
 
 
 UPLOAD_FOLDER = './uploads'
@@ -70,39 +72,7 @@ if os.path.isdir(jointdir):
     for i, dirname in enumerate(os.listdir(jointdir)):  
       labels.append(dirname)
 
-def getSamples(file): 
-    batch = vggish_input.wavfile_to_examples(file)
-
-    with tf.Graph().as_default(), tf.Session() as sess:
-        # Define the model in inference mode, load the checkpoint, and
-        # locate input and output tensors.
-        vggish_slim.define_vggish_slim(training=False)
-        vggish_slim.load_vggish_slim_checkpoint(sess, "vggish_model.ckpt")
-        features_tensor = sess.graph.get_tensor_by_name(
-            vggish_params.INPUT_TENSOR_NAME)
-        embedding_tensor = sess.graph.get_tensor_by_name(
-        vggish_params.OUTPUT_TENSOR_NAME)
-
-        [testSamples] = sess.run([embedding_tensor],
-                            feed_dict={features_tensor: batch})
-
-    return testSamples
-
-def analyse(allSamples):
-  output = [["file", "num", "class", "seconds", "percent"]]
-  for [name, samples] in allSamples:
-    test = np.array(samples)
-    predictions = model.predict(test)
-    for ndx, member in enumerate(predictions):
-      output.append([name, ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]])
-  return output
-
-def reformat(data):
-    output = []
-    for ndx, member in enumerate(data):
-      output.append("%s\t%s\t%s\t%s\t" % (ndx,  np.argmax(member), ndx*0.96, member[np.argmax(member)]))
-
-def process():
+def process(): 
     allSamples  = []
     if os.path.isdir(testFileDir):
 
@@ -136,7 +106,40 @@ def process():
     return output
 
 
+def listS3Folder(bucket, prefix, id, secret):
+    s3 = boto3.resource('s3', aws_access_key_id=id,
+        aws_secret_access_key=secret)
+    bucket = s3.Bucket(name=bucket)
 
+    output = []
+    for obj in bucket.objects.filter(Prefix=prefix):
+        file = ntpath.basename(obj.key)
+        if file:
+            output.append(file)
+
+
+    return output
+
+def downloadS3File(bucket, prefix, file, id, secret):
+    s3r = boto3.resource('s3', aws_access_key_id=id,
+    aws_secret_access_key=secret)
+
+    fileName = prefix + file
+    buck = s3r.Bucket(bucket)
+    destFile = os.path.join("./inputs/uploaded/",file)
+
+    return buck.download_file(fileName,destFile)
+    
+
+def uplaodS3File(bucket, prefix, file, id, secret):
+    s3r = boto3.resource('s3', aws_access_key_id=id,
+    aws_secret_access_key=secret)
+
+    fileName = prefix + file
+    buck = s3r.Bucket(bucket)
+    srcFile = os.path.join("./outputs/",file)
+
+    return buck.upload_file(srcFile,'output/'+file)
 
 
 def csvResponse(data):
@@ -147,6 +150,11 @@ def csvResponse(data):
     response.headers["Content-Disposition"] = "attachment; filename=export.tsv"
     response.headers["Content-type"] = "text/tsv"
     return response
+
+def csvToFile(name,data):
+    with open('./outputs/'+name+".tsv", mode='w') as output_file:
+        tsv_writer = csv.writer(output_file, delimiter='\t')
+        tsv_writer.writerows(data)
 
 
 
@@ -178,10 +186,14 @@ class TodoSimple(Resource):
         return {"output": str(output)}
 
     def put(self):
-        data = [[1,2], [3,4]]
+        parse = request.get_json()
+        id=parse["aws_access_key_id"]
+        secret=parse["aws_secret_access_key"]
+        bucket= parse["bucket"]
+        folder = parse["folder"]
+        output = listS3Folder(bucket, folder, id, secret)
 
-
-        return csvResponse(data)
+        return output
 
     def post(self):
 
@@ -244,10 +256,56 @@ class ClassificationManager(Resource):
         response = csvResponse(predictions)
         return response
 
+class S3Demo(Resource):
+    def post(self):
+        parse = request.get_json()
+        id=parse["aws_access_key_id"]
+        secret=parse["aws_secret_access_key"]
+        bucket= parse["bucket"]
+        prefix = parse["prefix"]
+        #file = parse["file"]
+
+        si = io.StringIO()
+        cw = csv.writer(si, delimiter='\t')
+
+
+        fileList = listS3Folder(bucket, prefix, id, secret)
+
+
+
+        for file in fileList:
+            fileBaseName = ntpath.basename(file)
+            (name,ext) = os.path.splitext(fileBaseName)
+
+            destFile = os.path.join("./inputs/uploaded/",fileBaseName)
+            destFileWav = os.path.join("./inputs/uploaded/",name+".wav")
+
+            downloadS3File(bucket, prefix, file, id, secret)
+            spectrum = getSpectrum(destFile)
+
+
+            #downloadS3File(bucket, prefix, file, id, secret)
+
+            os.remove(destFile)
+            os.remove(destFileWav)
+
+            samples = buildSamples(spectrum)
+            predictions = buildPredictions(model, samples, name)
+
+            csvToFile(name,predictions)
+            uplaodS3File(bucket, prefix, name+".tsv", id, secret)
+            cw.writerows(predictions)
+
+        response = make_response(si.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=export.tsv"
+        response.headers["Content-type"] = "text/tsv"
+        return response
+
 api.add_resource(TodoSimple, '/elm')
 api.add_resource(BatchManager, '/batches')
 api.add_resource(VectorManager, '/vectors')
 api.add_resource(ClassificationManager, '/classes')
+api.add_resource(S3Demo, '/s3')
 
  
 if __name__ == '__main__':

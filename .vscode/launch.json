@@ -13,7 +13,7 @@
       "console": "integratedTerminal",
       "env": {
         "S3_KEY": "AKIAIEEARPSPC4DBCZXA",
-        "S3_SECRET": "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"
+        "S3_SECRET": ""
       }
     },
 

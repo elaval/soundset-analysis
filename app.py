@@ -323,6 +323,26 @@ class S3Demo(Resource):
                 u"date":datetime.datetime.now()
             })
 
+            today = datetime.date.today()
+            todayId = "%02d%02d%02d" % (today.year, today.month, today.day)
+
+            totalRef = db.collection(u"summary").document(todayId)
+            totalRef.set({
+                u'lastUpdate':todayId
+            })
+
+            transaction = db.transaction()
+            """
+            @firestore.transactional
+            def update_in_transaction(transaction, totalRef):
+                snapshot = totalRef.get(transaction=transaction)
+                transaction.update(totalRef, {
+                    u'totalSamples': (snapshot.get(u'totalSamples') or 0) + 1
+                })
+
+            update_in_transaction(transaction, totalRef)
+            """
+
             csvToFile(name,predictions)
             uplaodS3File(bucket, prefix, name+".tsv", id, secret)
             cw.writerows(predictions)

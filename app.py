@@ -215,11 +215,17 @@ class TodoSimple(Resource):
 
     def put(self):
         parse = request.get_json()
-        id=parse["aws_access_key_id"]
-        secret=parse["aws_secret_access_key"]
+        id=S3_KEY
+        secret=S3_SECRET
         bucket= parse["bucket"]
         folder = parse["folder"]
-        output = listS3Folder(bucket, folder, id, secret)
+        iam = boto3.client('iam')
+
+        try:
+            output = listS3Folder(bucket, folder, id, secret)
+        except:
+            output = "Access denied"
+        
 
         return output
 
@@ -327,21 +333,12 @@ class S3Demo(Resource):
             todayId = "%02d%02d%02d" % (today.year, today.month, today.day)
 
             totalRef = db.collection(u"summary").document(todayId)
-            totalRef.set({
-                u'lastUpdate':todayId
+
+            totalRef.update({
+                u'lastUpdate': datetime.datetime.now()
             })
-
-            transaction = db.transaction()
-            """
-            @firestore.transactional
-            def update_in_transaction(transaction, totalRef):
-                snapshot = totalRef.get(transaction=transaction)
-                transaction.update(totalRef, {
-                    u'totalSamples': (snapshot.get(u'totalSamples') or 0) + 1
-                })
-
-            update_in_transaction(transaction, totalRef)
-            """
+            
+            
 
             csvToFile(name,predictions)
             uplaodS3File(bucket, prefix, name+".tsv", id, secret)

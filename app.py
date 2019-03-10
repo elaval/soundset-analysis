@@ -40,11 +40,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 import datetime
+import re
 
 S3_KEY =os.environ.get('S3_KEY')
 S3_SECRET=os.environ.get('S3_SECRET')
 
-cred = credentials.Certificate("./credentials/soundset-abffd-firebase-adminsdk-zrq83-d0a9bbfe7c.json")
+cred = credentials.Certificate("./credentials/soundset-abffd-firebase-adminsdk-sz6e6-659bee9e48.json")
 default_app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -151,7 +152,7 @@ def uplaodS3File(bucket, prefix, file, id, secret):
     buck = s3r.Bucket(bucket)
     srcFile = os.path.join("./outputs/",file)
 
-    return buck.upload_file(srcFile,'output/'+file)
+    return buck.upload_file(srcFile,'enel/output/'+file)
 
 
 def csvResponse(data):
@@ -214,6 +215,7 @@ class TodoSimple(Resource):
         return {"output": str(output)}
 
     def put(self):
+        """
         parse = request.get_json()
         id=S3_KEY
         secret=S3_SECRET
@@ -228,6 +230,61 @@ class TodoSimple(Resource):
         
 
         return output
+        """
+        id=os.environ.get('S3_KEY')
+        secret=os.environ.get('S3_SECRET')
+
+        docs = db.collection(u'newFiles').where(u'bucket', u'==', "soundset").get()
+
+        list = []
+        docIds = []
+
+        for doc in docs:
+            print(u'{} => {}'.format(doc.id, doc.to_dict()))
+            docDict = doc.to_dict()
+            list.append(docDict['key'])
+            docIds.append(doc.id)
+
+        target = list[0]
+        docId = docIds[0]
+
+
+        pattern = re.compile(r"(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<path>.+)")
+        m = pattern.search(target)
+        company = (m.group('company'))
+        path = (m.group('path'))
+
+        fileBaseName = ntpath.basename(path)
+        (name,ext) = os.path.splitext(fileBaseName)
+        
+        destFile = os.path.join("./inputs/uploaded/",fileBaseName)
+        destFileWav = os.path.join("./inputs/uploaded/",name+".wav")
+        bucket = "soundset"
+        prefix = company + "/input/" 
+        
+        downloadS3File("soundset", prefix, path, id, secret)
+        
+        spectrum = getSpectrum(destFile)
+
+        os.remove(destFile)
+        os.remove(destFileWav)
+
+        samples = buildSamples(spectrum)
+        predictions = buildPredictions(model, samples, name, labels)
+
+        si = io.StringIO()
+        cw = csv.writer(si, delimiter='\t')
+
+        csvToFile(name,predictions)
+        uplaodS3File(bucket, prefix, name+".tsv", id, secret)
+        cw.writerows(predictions)
+
+        docs = db.collection(u'newFiles').document(docId).delete()
+
+        response = make_response(si.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=export.tsv"
+        response.headers["Content-type"] = "text/tsv"
+        return docId
 
     def post(self):
 

@@ -2,3 +2,4 @@
 vggish*
 mel_features.py
 audiosetModels
+credentials/*.json

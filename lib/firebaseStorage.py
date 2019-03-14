@@ -87,12 +87,16 @@ def updateDailyUsage(summary):
   }
 
   try:
-    doc = doc_ref.get()
+    doc = totalRef.get()
     docDict = doc.to_dict()
+    print(docDict, docDict["seconds"])
     if "seconds" in docDict:
+      print("EXISTED")
       updateData["seconds"] = docDict["seconds"] + summary["seconds"]
     else : 
       updateData["seconds"] = summary["seconds"]
+      print("NEW")
+
     totalRef.update(updateData)
   except:
     updateData["seconds"] = summary["seconds"]

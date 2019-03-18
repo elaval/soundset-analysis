@@ -3,6 +3,7 @@ import os
 import ast
 import json
 from urllib.parse import unquote_plus
+import threading
 
 # Timers for asyc process
 from threading import Timer, Event
@@ -23,9 +24,6 @@ from flask_restful import Resource, Api, reqparse
 app = Flask(__name__)
 CORS(app) 
 api = Api(app)
-
-
-print(os.listdir("/credentials"))
 
 def ProcessPendingDocs(): 
   jobList = firebaseStorage.getPendingJobs()
@@ -88,8 +86,9 @@ f(f_stop)
 
 class SoundSetAPI(Resource):
     def get(self):
-        ProcessPendingDocs()
-        return {"output": "DONE"}
+        t = threading.Thread(target=ProcessPendingDocs)
+        t.start() 
+        return {"output": "Triggered"}
 
 
 api.add_resource(SoundSetAPI, '/trigger')

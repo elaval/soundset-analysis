@@ -25,10 +25,12 @@ BUCKET = "soundset"
 MODEL_FILE = "./models/enel/model.h5" 
 MODEL_FOLDER = "./models/enel" 
 LABELS_FILE = "./models/enel/labels.txt" 
-DOMAIN = "enel"
+DOMAIN = "colbun"
 
-s3storage.downloadS3File(BUCKET, DOMAIN + "/models/current", "model.h5", MODEL_FILE)
-s3storage.downloadS3File(BUCKET, DOMAIN + "/models/current", "labels.txt", LABELS_FILE)
+remoteModelFolder = os.path.join("model",DOMAIN)
+
+s3storage.downloadS3File(BUCKET, remoteModelFolder, "model.h5", MODEL_FILE)
+s3storage.downloadS3File(BUCKET, remoteModelFolder, "labels.txt", LABELS_FILE)
 
 class NeuralNetwork:
     def __init__(self):
@@ -185,14 +187,17 @@ def processFile(fileKey):
   print(dirName, name, ext)
 
   # Assuming a dirname with the format
-  # <company>/input/subdir
+  # data/<company>/input/subdir
   # We use regexp to extract the parts
-  pattern = re.compile(r"(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<subdir>.+)")
+  # pattern = re.compile(r"(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<subdir>.+)")
+  pattern = re.compile(r"data/(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<subdir>.+)")
+
   m = pattern.search(dirName)
   company = (m.group('company'))
   subdir = (m.group('subdir'))
 
-  outputPrefix = company+"/output/"+subdir+"/"
+  outputPrefix = os.path.join("data/",company, "output", subdir+"/")
+  #company+"/output/"+subdir+"/"
   
   destFile = os.path.join("./inputs/uploaded/",baseName)
   destFileWav = os.path.join("./inputs/uploaded/",name+".wav")

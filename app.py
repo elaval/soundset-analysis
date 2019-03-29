@@ -27,10 +27,9 @@ api = Api(app)
 
 def ProcessPendingDocs(): 
   jobList = firebaseStorage.getPendingJobs()
-  lockedJobs = firebaseStorage.getLockedJobs()
   for job in jobList:
       print(job)
-  if len(jobList) > 0:
+  while len(jobList) > 0 :
     nextJob = jobList[0]
     firebaseStorage.logLastActivity("START PROCESS {}".format(nextJob))
     success = PorcessJob(nextJob)
@@ -39,11 +38,13 @@ def ProcessPendingDocs():
     else:
       firebaseStorage.logLastActivity("SUCCESS PROCESSING {}".format(nextJob))
 
-    ProcessPendingDocs()
-  else:
-    msg = "NO PENDING JOBS - {} LOCKED JOBS".format(len(lockedJobs))
-    firebaseStorage.logLastActivity(msg)
-    print(msg)
+    jobList = firebaseStorage.getPendingJobs()
+
+  lockedJobs = firebaseStorage.getLockedJobs()
+
+  msg = "NO PENDING JOBS - {} LOCKED JOBS".format(len(lockedJobs))
+  firebaseStorage.logLastActivity(msg)
+  print(msg)
 
 def PorcessJob(id):
   firebaseStorage.lockJob(id)
@@ -79,17 +80,23 @@ def f(f_stop):
 
 f_stop = Event()
 # start calling f now and every 60 sec thereafter
+print("Threading Init", threading.active_count())
 f(f_stop)
+print("Threading Start", threading.active_count())
 
 # stop the thread when needed
 #f_stop.set()
 
 class SoundSetAPI(Resource):
     def get(self):
-        t = threading.Thread(target=ProcessPendingDocs)
-        t.start() 
-        return {"output": "Triggered"}
+        activeThreads =  threading.active_count()
 
+        if activeThreads < 5:
+          t = threading.Thread(target=ProcessPendingDocs)
+          t.start() 
+          return {"output": "Triggered"}
+        else:
+          return {"output": "Not Triggered. %s active threads" % activeThreads}
 
 api.add_resource(SoundSetAPI, '/trigger')
 

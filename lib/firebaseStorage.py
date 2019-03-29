@@ -35,7 +35,7 @@ db = firestore.client()
 jobsDicts = {}
 
 def getPendingJobs():
-  docs = db.collection(JOBS_PENDING_COLLECTION).where(u'bucket', u'==', BUCKET).where(UNLOCKED_PROPERTY, u'==', True).get()
+  docs = db.collection(JOBS_PENDING_COLLECTION).where(u'bucket', u'==', BUCKET).where(UNLOCKED_PROPERTY, u'==', True).limit(1).get()
         
   output = []
   for doc in docs:
@@ -45,7 +45,7 @@ def getPendingJobs():
   return output
 
 def getLockedJobs():
-  docs = db.collection(JOBS_PENDING_COLLECTION).where(u'bucket', u'==', BUCKET).where(UNLOCKED_PROPERTY, u'==', False).get()
+  docs = db.collection(JOBS_PENDING_COLLECTION).where(u'bucket', u'==', BUCKET).where(UNLOCKED_PROPERTY, u'==', False).limit(1).get()
         
   output = []
   for doc in docs:

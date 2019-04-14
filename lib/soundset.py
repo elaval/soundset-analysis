@@ -190,7 +190,7 @@ def processFile(fileKey):
   # data/<company>/input/subdir
   # We use regexp to extract the parts
   # pattern = re.compile(r"(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<subdir>.+)")
-  pattern = re.compile(r"data/(?P<company>[a-zA-Z0-9 ]+?)/input/(?P<subdir>.+)")
+  pattern = re.compile(r"data/(?P<company>[a-zA-Z0-9 ]+?)/input/?(?P<subdir>.*)")
 
   m = pattern.search(dirName)
   company = (m.group('company'))

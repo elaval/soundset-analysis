@@ -22,6 +22,8 @@ def downloadS3File(bucket, prefix, file, destPath):
     fileName = prefix + "/" + file
     buck = s3.Bucket(bucket)
 
+    print("About to download", fileName, destPath)
+
     return buck.download_file(fileName,destPath)
     
 

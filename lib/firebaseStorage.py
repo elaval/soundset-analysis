@@ -12,6 +12,7 @@ JOBS_DONE_COLLECTION = u'jobsDone'
 DAILY_USAGE_COLLECTION = u'dailyUsage'
 LOGS_COLLECTION = u'logs'
 ERRORS_COLLECTION = u'errors'
+DOMAINS_COLLECTION = u'domains'
 BUCKET = u'soundset'
 UNLOCKED_PROPERTY = u'unlocked'
 
@@ -123,3 +124,13 @@ def logError(info):
     u'info': info
   }
   errorRef.add(updateData)
+
+def getDomains():
+  docs = db.collection(DOMAINS_COLLECTION).get()
+
+  output = []
+  for doc in docs:
+    docDict = doc.to_dict()
+    output.append(docDict["name"])
+
+  return output

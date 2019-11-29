@@ -317,6 +317,7 @@ def processFile(fileKey):
     "outputKey": os.path.join(outputPrefix,name+".tsv"),
     "summary": sumariseClasses(predictions),
     "samples": len(samples),
-    "seconds": len(samples)*0.96
+    "seconds": len(samples)*0.96,
+    "domain": company
   }
   return result
